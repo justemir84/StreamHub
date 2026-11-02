@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "StreamHub",
+    "slug": "streamhub",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.jpg",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0b0f"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.justemir84.streamhub",
+      "intentFilters": [
+        {
+          "action": "MAIN",
+          "category": ["LEANBACK_LAUNCHER"]
+        }
+      ],
+      "banner": "./assets/icon.jpg"
+    },
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "7bf35a46-51da-49e6-85a7-7f24540c7a91"
+      }
+    },
+    "owner": "justemir84",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7bf35a46-51da-49e6-85a7-7f24540c7a91"
+    }
+  }
+}
