@@ -4,7 +4,7 @@ import { WebView } from "react-native-webview";
 import { getAccounts, saveAccount, addFavorite } from "../utils/storage";
 import { getSelectors } from "../data/sites";
 import { getTabs, addTab, removeTab } from "../utils/tabs";
-import { getAdBlock, getHttpsOnly, getDomStorage, getThirdPartyCookies } from "../utils/settings";
+import { getAdBlock, getHttpsOnly, getDomStorage, getThirdPartyCookies, getPopupBlock } from "../utils/settings";
 import { isBlockedUrl, isUnsafeUrl } from "../utils/blocklist";
 
 export default function WebViewScreen({ route, navigation }) {
@@ -26,12 +26,14 @@ export default function WebViewScreen({ route, navigation }) {
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [domStorage, setDomStorage] = useState(false);
   const [thirdPartyCookies, setThirdPartyCookies] = useState(false);
+  const [popupBlock, setPopupBlock] = useState(true);
 
   useEffect(() => {
     getAdBlock().then(setAdBlock);
     getHttpsOnly().then(setHttpsOnly);
     getDomStorage().then(setDomStorage);
     getThirdPartyCookies().then(setThirdPartyCookies);
+    getPopupBlock().then(setPopupBlock);
   }, []);
 
   useEffect(() => {
@@ -188,7 +190,7 @@ export default function WebViewScreen({ route, navigation }) {
         allowUniversalAccessFromFileURLs={false}
         allowFileAccessFromFileURLs={false}
         mixedContentMode="never"
-        setSupportMultipleWindows={false}
+        setSupportMultipleWindows={!popupBlock}
         originWhitelist={["*"]}
         javaScriptCanOpenWindowsAutomatically={false}
         mixedContentMode="always"
@@ -212,7 +214,8 @@ export default function WebViewScreen({ route, navigation }) {
         injectedJavaScript={`
           (function(){
             try {
-              window.open = function(){ return null; };
+              window.__POPUP_BLOCK__ = ${popupBlock ? "true" : "false"};
+              if (window.__POPUP_BLOCK__) window.open = function(){ return null; };
               document.addEventListener('click', function(e){
                 const a = e.target && e.target.closest ? e.target.closest('a') : null;
                 if (a && a.target === '_blank') a.target = '_self';

@@ -9,7 +9,6 @@ import SitesScreen from "./screens/SitesScreen";
 import WebViewScreen from "./screens/WebViewScreen";
 import AccountsScreen from "./screens/AccountsScreen";
 import FavoritesScreen from "./screens/FavoritesScreen";
-import TraktScreen from "./screens/TraktScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -70,7 +69,6 @@ export default function App() {
         <Tab.Screen name="Siteler" component={SitesStack} options={{ tabBarIcon: ({color,size}) => <Ionicons name="globe-outline" size={size} color={color} /> }} />
         <Tab.Screen name="Favoriler" component={FavoritesScreen} options={{ tabBarIcon: ({color,size}) => <Ionicons name="star-outline" size={size} color={color} /> }} />
         <Tab.Screen name="Hesaplar" component={AccountsScreen} options={{ tabBarIcon: ({color,size}) => <Ionicons name="person-outline" size={size} color={color} /> }} />
-        <Tab.Screen name="Trakt" component={TraktScreen} options={{ tabBarIcon: ({color,size}) => <Ionicons name="sync-outline" size={size} color={color} /> }} />
       </Tab.Navigator>
     </NavigationContainer>
   );

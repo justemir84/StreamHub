@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Switch } from "react-native";
 import { getAccounts, removeAccount } from "../utils/storage";
-import { getAdBlock, setAdBlock, getHttpsOnly, setHttpsOnly, getDomStorage, setDomStorage, getThirdPartyCookies, setThirdPartyCookies } from "../utils/settings";
+import { getAdBlock, setAdBlock, getHttpsOnly, setHttpsOnly, getDomStorage, setDomStorage, getThirdPartyCookies, setThirdPartyCookies, getPopupBlock, setPopupBlock } from "../utils/settings";
 import TVFocusable from "../components/TVFocusable";
 
 export default function AccountsScreen() {
@@ -10,6 +10,7 @@ export default function AccountsScreen() {
   const [httpsOnly, setHttpsOnlyState] = useState(true);
   const [domStorage, setDomStorageState] = useState(false);
   const [thirdPartyCookies, setThirdPartyCookiesState] = useState(false);
+  const [popupBlock, setPopupBlockState] = useState(true);
 
   const load = () => getAccounts().then(setAccounts);
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function AccountsScreen() {
     getHttpsOnly().then(setHttpsOnlyState);
     getDomStorage().then(setDomStorageState);
     getThirdPartyCookies().then(setThirdPartyCookiesState);
+    getPopupBlock().then(setPopupBlockState);
   }, []);
 
   const handleRemove = async (a) => {
@@ -40,6 +42,10 @@ export default function AccountsScreen() {
   const toggleThirdPartyCookies = async (v) => {
     setThirdPartyCookiesState(v);
     await setThirdPartyCookies(v);
+  };
+  const togglePopupBlock = async (v) => {
+    setPopupBlockState(v);
+    await setPopupBlock(v);
   };
 
   return (
@@ -78,6 +84,10 @@ export default function AccountsScreen() {
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Üçüncü Taraf Çerezler</Text>
           <Switch value={thirdPartyCookies} onValueChange={toggleThirdPartyCookies} trackColor={{ true: "#3b82f6" }} />
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Popup Engelleme</Text>
+          <Switch value={popupBlock} onValueChange={togglePopupBlock} trackColor={{ true: "#3b82f6" }} />
         </View>
       </View>
     </View>

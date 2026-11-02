@@ -4,6 +4,7 @@ const ADBLOCK_KEY = "adblock_enabled";
 const HTTPS_ONLY_KEY = "https_only";
 const DOM_STORAGE_KEY = "dom_storage";
 const THIRD_PARTY_COOKIES_KEY = "third_party_cookies";
+const POPUP_BLOCK_KEY = "popup_block";
 const REMOTE_SITES_URL_KEY = "remote_sites_url";
 
 export async function getAdBlock() {
@@ -35,6 +36,14 @@ export async function getThirdPartyCookies() {
 }
 export async function setThirdPartyCookies(v) {
   await AsyncStorage.setItem(THIRD_PARTY_COOKIES_KEY, String(v));
+}
+
+export async function getPopupBlock() {
+  const v = await AsyncStorage.getItem(POPUP_BLOCK_KEY);
+  return v === null ? true : v === "true";
+}
+export async function setPopupBlock(v) {
+  await AsyncStorage.setItem(POPUP_BLOCK_KEY, String(v));
 }
 
 const DEFAULT_REMOTE_URL = "https://raw.githubusercontent.com/justemir84/StreamHub/main/sites.json";
