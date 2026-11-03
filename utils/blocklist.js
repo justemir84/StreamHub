@@ -33,11 +33,13 @@ export function isBlockedUrl(url) {
 export function isUnsafeUrl(url) {
   try {
     const u = new URL(url);
+    // WebView oynatıcıları sık sık blob:/data:/about: kullanır; bunları engellemeyelim.
+    if (u.protocol === "about:" || u.protocol === "data:" || u.protocol === "blob:") return false;
     if (u.protocol !== "https:" && u.protocol !== "http:") return true;
     // Bilinen şüpheli uzantılar
-    if (/\.(exe|apk|bat|cmd|scr|msi)$/i.test(u.pathname)) return true;
+    if (/\.(exe|apk|bat|cmd|scr|msi|jar)$/i.test(u.pathname)) return true;
     return false;
   } catch (e) {
-    return true;
+    return false;
   }
 }

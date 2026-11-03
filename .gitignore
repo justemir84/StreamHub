@@ -1,7 +1,13 @@
 node_modules/
 dist/
+dist-test/
 .expo/
 android/
 ios/
 *.log
+build-log.bin
+*.hbc
+*.apk
+aligned.apk
+.DS_Store
 

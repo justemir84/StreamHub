@@ -24,7 +24,7 @@ export async function setHttpsOnly(v) {
 
 export async function getDomStorage() {
   const v = await AsyncStorage.getItem(DOM_STORAGE_KEY);
-  return v === null ? false : v === "true";
+  return v === null ? true : v === "true";
 }
 export async function setDomStorage(v) {
   await AsyncStorage.setItem(DOM_STORAGE_KEY, String(v));
@@ -32,7 +32,7 @@ export async function setDomStorage(v) {
 
 export async function getThirdPartyCookies() {
   const v = await AsyncStorage.getItem(THIRD_PARTY_COOKIES_KEY);
-  return v === null ? false : v === "true";
+  return v === null ? true : v === "true";
 }
 export async function setThirdPartyCookies(v) {
   await AsyncStorage.setItem(THIRD_PARTY_COOKIES_KEY, String(v));

@@ -79,14 +79,26 @@ export default function SitesScreen({ navigation }) {
       <FlatList
         data={filtered}
         keyExtractor={item => item.id || item.url}
-        renderItem={({ item }) => (
-          <TVFocusable style={styles.card} onPress={() => navigation.navigate("WebView", { site: item })} onLongPress={() => handleRemoveCustom(item)}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.url}>{item.url}</Text>
-            <Text style={styles.cat}>{item.category}</Text>
-            {item.id?.startsWith("custom_") && <Text style={styles.customTag}>Özel</Text>}
-          </TVFocusable>
+        renderItem={({ item, index }) => (
+          <View style={styles.cardRow}>
+            <TVFocusable
+              style={styles.card}
+              hasTVPreferredFocus={index === 0}
+              onPress={() => navigation.navigate("WebView", { site: item })}
+            >
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.url}>{item.url}</Text>
+              <Text style={styles.cat}>{item.category}</Text>
+              {item.id?.startsWith("custom_") && <Text style={styles.customTag}>Özel</Text>}
+            </TVFocusable>
+            {item.id?.startsWith("custom_") && (
+              <TVFocusable style={styles.removeBtn} onPress={() => handleRemoveCustom(item)}>
+                <Text style={styles.remove}>Sil</Text>
+              </TVFocusable>
+            )}
+          </View>
         )}
+        contentContainerStyle={{ paddingBottom: 24 }}
       />
       <Modal visible={showAdd} transparent animationType="slide">
         <View style={styles.modalBg}>
@@ -109,22 +121,25 @@ export default function SitesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0b0b0f", padding: 12 },
-  topRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  search: { backgroundColor: "#1a1a24", color: "#fff", padding: 12, borderRadius: 10 },
-  addBtn: { backgroundColor: "#3b82f6", paddingHorizontal: 14, justifyContent: "center", borderRadius: 10 },
-  sortBtn: { backgroundColor: "#2a2a3a", paddingHorizontal: 12, justifyContent: "center", borderRadius: 10 },
-  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  card: { backgroundColor: "#15151f", padding: 20, borderRadius: 14, marginBottom: 12, borderWidth: 2, borderColor: "transparent", minHeight: 80 },
-  name: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  url: { color: "#888", fontSize: 12, marginTop: 2 },
-  cat: { color: "#555", fontSize: 11, marginTop: 4 },
-  customTag: { color: "#f59e0b", fontSize: 10, marginTop: 2 },
+  container: { flex: 1, backgroundColor: "#0b0b0f", padding: 16 },
+  topRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  search: { backgroundColor: "#1a1a24", color: "#fff", padding: 14, borderRadius: 10, fontSize: 18 },
+  addBtn: { backgroundColor: "#3b82f6", paddingHorizontal: 16, justifyContent: "center", borderRadius: 10 },
+  sortBtn: { backgroundColor: "#2a2a3a", paddingHorizontal: 14, justifyContent: "center", borderRadius: 10 },
+  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  cardRow: { flexDirection: "row", marginBottom: 12 },
+  card: { flex: 1, backgroundColor: "#15151f", padding: 22, borderRadius: 14, borderWidth: 2, borderColor: "transparent", minHeight: 100, justifyContent: "center" },
+  name: { color: "#fff", fontSize: 24, fontWeight: "700" },
+  url: { color: "#999", fontSize: 16, marginTop: 4 },
+  cat: { color: "#666", fontSize: 14, marginTop: 6 },
+  customTag: { color: "#f59e0b", fontSize: 13, marginTop: 4 },
+  removeBtn: { width: 88, marginLeft: 10, backgroundColor: "#2a1420", borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
+  remove: { color: "#ef4444", fontSize: 18, fontWeight: "700" },
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 24 },
   modal: { backgroundColor: "#15151f", borderRadius: 16, padding: 20 },
-  modalTitle: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 12 },
-  input: { backgroundColor: "#0b0b0f", color: "#fff", padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: "#2a2a3a" },
-  saveBtn: { backgroundColor: "#3b82f6", padding: 12, borderRadius: 10, alignItems: "center", marginTop: 4 },
-  saveText: { color: "#fff", fontWeight: "700" },
-  cancel: { color: "#888", textAlign: "center", marginTop: 12 }
+  modalTitle: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 14 },
+  input: { backgroundColor: "#0b0b0f", color: "#fff", padding: 14, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: "#2a2a3a", fontSize: 18 },
+  saveBtn: { backgroundColor: "#3b82f6", padding: 14, borderRadius: 10, alignItems: "center", marginTop: 4 },
+  saveText: { color: "#fff", fontWeight: "700", fontSize: 18 },
+  cancel: { color: "#888", textAlign: "center", marginTop: 12, fontSize: 17 }
 });
