@@ -69,6 +69,10 @@ export default function TVFocusable({
   );
 
   // Android TV: native global odak dinleyicisinden gelen tag ile esles.
+  // findNodeHandle ilk render'da null donebilir (view henuz mount olmadi);
+  // bu yuzden her render'da kontrol icin ref taze tutulmustur. Tag olusunca
+  // bir sonraki render'da abonelik kurulur — buradaki effect her render'da
+  // calisip tag'i tekrar dogrular (depsiz).
   useEffect(() => {
     if (!TV_FOCUS_AVAILABLE || !focusable || disabled) return undefined;
 
@@ -86,7 +90,7 @@ export default function TVFocusable({
         onBlurRef.current?.(event);
       }
     });
-  }, [setFocusedState, focusable, disabled]);
+  });
 
   const handleFocus = useCallback(
     (e) => {

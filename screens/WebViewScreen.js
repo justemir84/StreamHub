@@ -29,7 +29,7 @@ import { isBlockedUrl, isUnsafeUrl } from "../utils/blocklist";
 import TVFocusable from "../components/TVFocusable";
 import TvFocusScope from "../components/TvFocusScope";
 import { useFocusableInput } from "../utils/tvFocus";
-import { PAGE_SCRIPT, cursorCommand } from "../utils/tvNav";
+import { PAGE_SCRIPT, cursorCommand, moveCommand, clickCommand } from "../utils/tvNav";
 
 function toUrl(raw) {
   let u = (raw || "").trim();
@@ -91,9 +91,16 @@ export default function WebViewScreen({ route, navigation }) {
   const [popupBlock, setPopupBlock] = useState(true);
   const [cursorMode, setCursorModeState] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [toolbarFocusKey, setToolbarFocusKey] = useState(0);
   const addressFocus = useFocusableInput();
   const usernameFocus = useFocusableInput();
   const passwordFocus = useFocusableInput();
+
+  // WebView'deki D-pad / OK tuslarini yakalayan ana konteyner ref'i.
+  // WebView native odağı almadigi icin (requestFocus kaldirildi) RN bu tuslari
+  // yakalayip cursor modunda __STREAMHUB_MOVE__ / __STREAMHUB_CLICK__ olarak
+  // sayfaya enjekte eder; focus modunda ise KeyboardEvent ile sayfaya iletir.
+  const keyCaptureRef = useRef(null);
 
   useEffect(() => {
     getAdBlock().then(setAdBlock);
@@ -174,6 +181,64 @@ export default function WebViewScreen({ route, navigation }) {
     if (next) setShowHint(true);
   }, [cursorMode, applyCursorMode]);
 
+  // D-pad / OK tuslarini yakalar. Cursor modu acikken __STREAMHUB_MOVE__ /
+  // __STREAMHUB_CLICK__ komutlarini WebView'e enjekte eder; focus modunda ise
+  // sayfadaki odak motorunun calismasi icin KeyboardEvent'i sayfaya iletir.
+  const handleKeyDown = useCallback(
+    (e) => {
+      const nativeEvent = e.nativeEvent || e;
+      const key = nativeEvent.key || "";
+      const code = nativeEvent.keyCode || 0;
+
+      const up = key === "ArrowUp" || code === 38 || code === 19;
+      const down = key === "ArrowDown" || code === 40 || code === 20;
+      const left = key === "ArrowLeft" || code === 37 || code === 21;
+      const right = key === "ArrowRight" || code === 39 || code === 22;
+      const ok = key === "Enter" || code === 13 || key === " " || code === 32 || code === 23 || code === 66;
+
+      if (!(up || down || left || right || ok)) return;
+
+      try {
+        e.preventDefault?.();
+      } catch (_) {}
+
+      if (cursorMode) {
+        if (up || down || left || right) {
+          const dir = up ? "up" : down ? "down" : left ? "left" : "right";
+          webRef.current?.injectJavaScript(moveCommand(dir));
+        } else if (ok) {
+          webRef.current?.injectJavaScript(clickCommand());
+        }
+      } else {
+        // Focus modu: sayfadaki odak movimentasyonu icin bir KeyboardEvent
+        // uretir. TV focus script'i (PAGE_SCRIPT) bu eventi yakalar.
+        let keyName = "";
+        let keyCode = 0;
+        if (up) { keyName = "ArrowUp"; keyCode = 38; }
+        else if (down) { keyName = "ArrowDown"; keyCode = 40; }
+        else if (left) { keyName = "ArrowLeft"; keyCode = 37; }
+        else if (right) { keyName = "ArrowRight"; keyCode = 39; }
+        else if (ok) { keyName = "Enter"; keyCode = 13; }
+
+        const script = `(function(){var ev=new KeyboardEvent('keydown',{key:'${keyName}',code:'${keyName}',keyCode:${keyCode},which:${keyCode},bubbles:true,cancelable:true});document.dispatchEvent(ev);return true;})();`;
+        webRef.current?.injectJavaScript(script);
+      }
+    },
+    [cursorMode, moveCommand, clickCommand]
+  );
+
+  // WebView'den gelen mesajlari isler. 'streamhub:toToolbar' imlecin en
+  // ustteyken UP tusuna gelince araç çubuğuna odagi donmeye calisir.
+  const handleMessage = useCallback(
+    (e) => {
+      const data = e?.nativeEvent?.data;
+      if (data === "streamhub:toToolbar") {
+        setToolbarFocusKey((k) => k + 1);
+      }
+    },
+    []
+  );
+
   const handleAddAccount = async () => {
     if (!username) return;
     const acc = { siteId: site.id, username, password, createdAt: Date.now() };
@@ -249,17 +314,34 @@ export default function WebViewScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      focusable={true}
+      hasTVPreferredFocus={true}
+      onKeyDown={handleKeyDown}
+    >
       {/* tarayici arac cubugu */}
       <View style={styles.toolbar}>
-        <NavButton icon="home-outline" onPress={goHome} hasTVPreferredFocus />
-        <NavButton icon="arrow-back" disabled={!canGoBack} onPress={() => webRef.current?.goBack()} />
+        <NavButton
+          icon="home-outline"
+          onPress={goHome}
+          hasTVPreferredFocus
+          focusable={!cursorMode}
+          key={toolbarFocusKey}
+        />
+        <NavButton
+          icon="arrow-back"
+          disabled={!canGoBack}
+          onPress={() => webRef.current?.goBack()}
+          focusable={!cursorMode}
+        />
         <NavButton
           icon="arrow-forward"
           disabled={!canGoForward}
           onPress={() => webRef.current?.goForward()}
+          focusable={!cursorMode}
         />
-        <NavButton icon="refresh" onPress={() => webRef.current?.reload()} />
+        <NavButton icon="refresh" onPress={() => webRef.current?.reload()} focusable={!cursorMode} />
 
         <TextInput
           {...addressFocus.focusProps}
@@ -275,15 +357,17 @@ export default function WebViewScreen({ route, navigation }) {
           autoCorrect={false}
           returnKeyType="go"
           onSubmitEditing={() => openUrl(address)}
+          focusable={!cursorMode}
         />
 
-        <NavButton icon="star-outline" onPress={handleAddFavorite} />
-        <NavButton icon="person-outline" onPress={() => setShowAdd(true)} />
+        <NavButton icon="star-outline" onPress={handleAddFavorite} focusable={!cursorMode} />
+        <NavButton icon="person-outline" onPress={() => setShowAdd(true)} focusable={!cursorMode} />
         <NavButton
           icon="radio-button-on"
           label="Fare"
           active={cursorMode}
           onPress={toggleCursor}
+          focusable={!cursorMode}
         />
         {loading && <ActivityIndicator size="small" color="#4a9eff" style={styles.spinner} />}
       </View>
@@ -350,11 +434,11 @@ export default function WebViewScreen({ route, navigation }) {
           }}
           onLoadEnd={() => {
             setLoading(false);
-            try {
-              webRef.current?.requestFocus?.();
-            } catch (e) {}
+            // WebView native odağı almayacak; D-pad tuslari RN'de yakalanip
+            // sayfaya enjekte edilecek. requestFocus() cagirilmamali.
             if (cursorMode) applyCursorMode(true);
           }}
+          onMessage={handleMessage}
           onError={(e) => {
             setLoading(false);
             setError(e?.nativeEvent?.description || "Sayfa yüklenemedi.");
