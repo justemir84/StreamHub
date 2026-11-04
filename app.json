@@ -47,7 +47,8 @@
         }
       ],
       "./plugins/withTV",
-      "./plugins/withSigning"
+      "./plugins/withSigning",
+      "./plugins/withTvFocus"
     ]
   }
 }

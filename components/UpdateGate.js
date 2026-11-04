@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import TVFocusable from "./TVFocusable";
+import TvFocusScope from "./TvFocusScope";
 import {
   checkForUpdate,
   downloadUpdate,
@@ -62,20 +63,46 @@ export default function UpdateGate({ children }) {
     return () => clearTimeout(timer);
   }, [autoChecked, check]);
 
-  const install = useCallback(async () => {
-    if (!update) return;
+  const install = useCallback(
+    async (info) => {
+      const target = info || update;
+      if (!target) return false;
+      setError(null);
+      setUpdate(target);
+      setDismissed(false);
+      setProgress(0);
+      try {
+        const localUri = await downloadUpdate(target, setProgress);
+        setProgress(null);
+        await installApk(localUri);
+        setUpdate(null);
+        return true;
+      } catch (e) {
+        setProgress(null);
+        setError(e?.message || "Güncelleme kurulamadı.");
+        return false;
+      }
+    },
+    [update]
+  );
+
+  // Ayarlar ekranindaki "Güncelle" butonu icin:
+  // once kontrol eder, yeni surum varsa indirip kurulum ekranini acar.
+  const checkAndInstall = useCallback(async () => {
+    setChecking(true);
     setError(null);
-    setProgress(0);
     try {
-      const localUri = await downloadUpdate(update, setProgress);
-      setProgress(null);
-      await installApk(localUri);
-      setUpdate(null);
+      const info = await checkForUpdate();
+      if (!info) return "latest";
+      await install(info);
+      return "installed";
     } catch (e) {
-      setProgress(null);
-      setError(e?.message || "Güncelleme kurulamadı.");
+      setError(e?.message || "Güncelleme denetlenemedi.");
+      return "error";
+    } finally {
+      setChecking(false);
     }
-  }, [update]);
+  }, [install]);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
@@ -89,13 +116,25 @@ export default function UpdateGate({ children }) {
       update,
       progress,
       checking,
+      busy: progress !== null,
       error,
       check,
       install,
+      checkAndInstall,
       dismiss,
       visible: !!update && !dismissed,
     }),
-    [update, progress, checking, error, check, install, dismiss, dismissed]
+    [
+      update,
+      progress,
+      checking,
+      error,
+      check,
+      install,
+      checkAndInstall,
+      dismiss,
+      dismissed,
+    ]
   );
 
   const busy = progress !== null;
@@ -110,6 +149,7 @@ export default function UpdateGate({ children }) {
         onRequestClose={dismiss}
       >
         <View style={styles.backdrop}>
+          <TvFocusScope />
           <View style={styles.card}>
             <Text style={styles.title}>Yeni sürüm hazır</Text>
             <Text style={styles.version}>
@@ -145,7 +185,7 @@ export default function UpdateGate({ children }) {
                     style={styles.primaryBtn}
                     focusedStyle={styles.primaryBtnFocused}
                     hasTVPreferredFocus
-                    onPress={install}
+                    onPress={() => install()}
                   >
                     <Text style={styles.primaryText}>İndir ve Kur</Text>
                   </TVFocusable>

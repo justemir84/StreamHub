@@ -6,6 +6,7 @@ const DOM_STORAGE_KEY = "dom_storage";
 const THIRD_PARTY_COOKIES_KEY = "third_party_cookies";
 const POPUP_BLOCK_KEY = "popup_block";
 const REMOTE_SITES_URL_KEY = "remote_sites_url";
+const CURSOR_MODE_KEY = "cursor_mode";
 
 export async function getAdBlock() {
   const v = await AsyncStorage.getItem(ADBLOCK_KEY);
@@ -47,6 +48,15 @@ export async function setPopupBlock(v) {
 }
 
 const DEFAULT_REMOTE_URL = "https://raw.githubusercontent.com/justemir84/StreamHub/main/sites.json";
+
+// Site icinde beyaz daire "fare" modu (D-pad ile gezinme).
+export async function getCursorMode() {
+  const v = await AsyncStorage.getItem(CURSOR_MODE_KEY);
+  return v === null ? false : v === "true";
+}
+export async function setCursorMode(v) {
+  await AsyncStorage.setItem(CURSOR_MODE_KEY, String(v));
+}
 
 export async function getRemoteSitesUrl() {
   const v = await AsyncStorage.getItem(REMOTE_SITES_URL_KEY);

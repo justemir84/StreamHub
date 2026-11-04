@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, FlatList, StyleSheet } from "react-native";
 import { getFavorites, removeFavorite } from "../utils/storage";
 import { SITES } from "../data/sites";
 import TVFocusable from "../components/TVFocusable";
@@ -26,9 +26,9 @@ export default function FavoritesScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Favoriler</Text>
       <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 8 }}>
-        <TouchableOpacity style={styles.sortBtn} onPress={() => setSort(sort === "title" ? "recent" : "title")}>
+        <TVFocusable style={styles.sortBtn} radius={8} onPress={() => setSort(sort === "title" ? "recent" : "title")}>
           <Text style={styles.sortText}>{sort === "title" ? "A-Z" : "Son"}</Text>
-        </TouchableOpacity>
+        </TVFocusable>
       </View>
       <FlatList
         data={[...favs].sort((a, b) => sort === "title" ? (a.title || "").localeCompare(b.title || "") : (b.createdAt || 0) - (a.createdAt || 0))}

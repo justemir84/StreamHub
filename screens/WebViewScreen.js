@@ -8,10 +8,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View
 } from "react-native";
 import { WebView } from "react-native-webview";
+import { Ionicons } from "@expo/vector-icons";
 import { useKeepAwake } from "expo-keep-awake";
 import { getAccounts, saveAccount, addFavorite } from "../utils/storage";
 import { getSelectors } from "../data/sites";
@@ -21,110 +21,15 @@ import {
   getHttpsOnly,
   getDomStorage,
   getThirdPartyCookies,
-  getPopupBlock
+  getPopupBlock,
+  getCursorMode,
+  setCursorMode
 } from "../utils/settings";
 import { isBlockedUrl, isUnsafeUrl } from "../utils/blocklist";
-
-// TV kumandasinda yon tuslariyla sayfa icinde gezinme.
-// WebView'in kendi odak motoru Android TV'de calismadigi icin
-// odaklanabilir ogeler arasinda JS ile geciyoruz.
-const TV_NAV_SCRIPT = `
-(function () {
-  try {
-    if (window.__STREAMHUB_TV_NAV__) return true;
-    window.__STREAMHUB_TV_NAV__ = true;
-
-    var SELECTOR = 'a[href],button,input,select,textarea,[role="button"],[role="link"],[tabindex]:not([tabindex="-1"])';
-
-    function isVisible(el) {
-      var r = el.getBoundingClientRect();
-      if (r.width < 3 || r.height < 3) return false;
-      var s = window.getComputedStyle(el);
-      return s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
-    }
-
-    function getItems() {
-      return Array.prototype.filter.call(document.querySelectorAll(SELECTOR), function (el) {
-        return isVisible(el) && !el.disabled && el.getAttribute('aria-hidden') !== 'true';
-      });
-    }
-
-    function activate(el) {
-      if (!el) return;
-      try { el.focus(); } catch (e) {}
-      try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (e) {}
-    }
-
-    function move(dir) {
-      var list = getItems();
-      if (!list.length) return false;
-      var i = list.indexOf(document.activeElement);
-      if (i < 0) { activate(list[0]); return true; }
-
-      var from = list[i].getBoundingClientRect();
-      var cx = from.left + from.width / 2;
-      var cy = from.top + from.height / 2;
-      var best = -1;
-      var bestScore = Infinity;
-
-      for (var j = 0; j < list.length; j++) {
-        if (j === i) continue;
-        var r = list[j].getBoundingClientRect();
-        var dx = (r.left + r.width / 2) - cx;
-        var dy = (r.top + r.height / 2) - cy;
-        var horizontal = dir === 'ArrowLeft' || dir === 'ArrowRight';
-        var delta = horizontal ? dx : dy;
-        if (horizontal ? (dir === 'ArrowRight' ? delta <= 4 : delta >= -4)
-                       : (dir === 'ArrowDown' ? delta <= 4 : delta >= -4)) continue;
-        var primary = Math.abs(delta);
-        var secondary = Math.abs(horizontal ? dy : dx);
-        var score = primary + secondary * 2;
-        if (score < bestScore) { bestScore = score; best = j; }
-      }
-
-      if (best >= 0) { activate(list[best]); return true; }
-      return false;
-    }
-
-    document.addEventListener('keydown', function (e) {
-      var target = e.target;
-      var tag = target && target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (target && target.isContentEditable)) return;
-
-      var active = document.activeElement;
-      if (active && active.tagName === 'VIDEO') return;
-
-      var key = e.key || '';
-      var code = e.keyCode || 0;
-
-      if (key === 'Enter' || code === 13 || key === ' ' || code === 32) {
-        var el = active && active !== document.body ? active : target;
-        if (el && el !== document.body && typeof el.click === 'function') {
-          e.preventDefault();
-          e.stopPropagation();
-          el.click();
-        }
-        return;
-      }
-
-      if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight' ||
-          code === 37 || code === 38 || code === 39 || code === 40) {
-        var dir = key;
-        if (!dir) dir = code === 37 ? 'ArrowLeft' : code === 38 ? 'ArrowUp' : code === 39 ? 'ArrowRight' : 'ArrowDown';
-        if (move(dir)) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }
-    }, true);
-
-    return true;
-  } catch (e) {
-    return false;
-  }
-})();
-true;
-`;
+import TVFocusable from "../components/TVFocusable";
+import TvFocusScope from "../components/TvFocusScope";
+import { useFocusableInput } from "../utils/tvFocus";
+import { PAGE_SCRIPT, cursorCommand } from "../utils/tvNav";
 
 function toUrl(raw) {
   let u = (raw || "").trim();
@@ -142,6 +47,21 @@ function escapeForScript(value) {
     .replace(/'/g, "\\'")
     .replace(/\r/g, "\\r")
     .replace(/\n/g, "\\n");
+}
+
+function NavButton({ icon, onPress, disabled = false, active = false, label, hasTVPreferredFocus = false }) {
+  return (
+    <TVFocusable
+      radius={8}
+      disabled={disabled}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+      onPress={onPress}
+      style={[styles.navBtn, active && styles.navBtnActive, disabled && styles.navBtnDisabled]}
+    >
+      <Ionicons name={icon} size={20} color={active ? "#fff" : "#cfcfcf"} />
+      {!!label && <Text style={[styles.navBtnLabel, active && styles.navBtnLabelActive]}>{label}</Text>}
+    </TVFocusable>
+  );
 }
 
 export default function WebViewScreen({ route, navigation }) {
@@ -169,6 +89,11 @@ export default function WebViewScreen({ route, navigation }) {
   const [domStorage, setDomStorage] = useState(true);
   const [thirdPartyCookies, setThirdPartyCookies] = useState(true);
   const [popupBlock, setPopupBlock] = useState(true);
+  const [cursorMode, setCursorModeState] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const addressFocus = useFocusableInput();
+  const usernameFocus = useFocusableInput();
+  const passwordFocus = useFocusableInput();
 
   useEffect(() => {
     getAdBlock().then(setAdBlock);
@@ -176,11 +101,12 @@ export default function WebViewScreen({ route, navigation }) {
     getDomStorage().then(setDomStorage);
     getThirdPartyCookies().then(setThirdPartyCookies);
     getPopupBlock().then(setPopupBlock);
+    getCursorMode().then(setCursorModeState);
   }, []);
 
   useEffect(() => {
-    getAccounts().then(list => {
-      const filtered = list.filter(a => a.siteId === site.id);
+    getAccounts().then((list) => {
+      const filtered = list.filter((a) => a.siteId === site.id);
       setAccounts(filtered);
       if (filtered.length) setSelected(filtered[0]);
     });
@@ -215,6 +141,12 @@ export default function WebViewScreen({ route, navigation }) {
     return () => sub.remove();
   }, [showAdd, showTabs, canGoBack]);
 
+  useEffect(() => {
+    if (!showHint) return;
+    const timer = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showHint]);
+
   const goHome = () => {
     navigation?.navigate("Siteler", { screen: "Sites" });
   };
@@ -228,11 +160,25 @@ export default function WebViewScreen({ route, navigation }) {
     setAddress(url);
   }, []);
 
+  const applyCursorMode = useCallback((on) => {
+    try {
+      webRef.current?.injectJavaScript(cursorCommand(on));
+    } catch (e) {}
+  }, []);
+
+  const toggleCursor = useCallback(() => {
+    const next = !cursorMode;
+    setCursorModeState(next);
+    setCursorMode(next).catch(() => {});
+    applyCursorMode(next);
+    if (next) setShowHint(true);
+  }, [cursorMode, applyCursorMode]);
+
   const handleAddAccount = async () => {
     if (!username) return;
     const acc = { siteId: site.id, username, password, createdAt: Date.now() };
     const updated = await saveAccount(acc);
-    const filtered = updated.filter(a => a.siteId === site.id);
+    const filtered = updated.filter((a) => a.siteId === site.id);
     setAccounts(filtered);
     if (!selected) setSelected(filtered[0]);
     setShowAdd(false);
@@ -304,74 +250,60 @@ export default function WebViewScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>{site.name}</Text>
-        <View style={{ flexDirection: "row", gap: 6 }}>
-          <TouchableOpacity style={styles.btn} onPress={handleAddFavorite}>
-            <Text style={styles.btnText}>★ Fav</Text>
-          </TouchableOpacity>
-          {accounts.length > 0 && (
-            <TouchableOpacity style={styles.btn} onPress={handleAutoFill}>
-              <Text style={styles.btnText}>Oto-doldur</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.btn} onPress={() => setShowAdd(true)}>
-            <Text style={styles.btnText}>+ Hesap</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.addressBar}>
-        <TouchableOpacity
-          style={[styles.homeBtn, !canGoBack && styles.btnDisabled]}
-          disabled={!canGoBack}
-          onPress={() => webRef.current?.goBack()}
-        >
-          <Text style={styles.goText}>◀</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.homeBtn, !canGoForward && styles.btnDisabled]}
+      {/* tarayici arac cubugu */}
+      <View style={styles.toolbar}>
+        <NavButton icon="home-outline" onPress={goHome} hasTVPreferredFocus />
+        <NavButton icon="arrow-back" disabled={!canGoBack} onPress={() => webRef.current?.goBack()} />
+        <NavButton
+          icon="arrow-forward"
           disabled={!canGoForward}
           onPress={() => webRef.current?.goForward()}
-        >
-          <Text style={styles.goText}>▶</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.homeBtn} onPress={() => webRef.current?.reload()}>
-          <Text style={styles.goText}>⟳</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.homeBtn} onPress={goHome}>
-          <Text style={styles.goText}>🏠</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.homeBtn} onPress={() => setShowTabs(true)}>
-          <Text style={styles.goText}>🗂</Text>
-        </TouchableOpacity>
+        />
+        <NavButton icon="refresh" onPress={() => webRef.current?.reload()} />
+
         <TextInput
-          style={styles.addressInput}
+          {...addressFocus.focusProps}
+          style={[
+            styles.addressInput,
+            addressFocus.focused && styles.addressInputFocused,
+          ]}
           value={address}
           onChangeText={setAddress}
-          placeholder="URL veya arama..."
-          placeholderTextColor="#888"
+          placeholder="URL girin veya arayın..."
+          placeholderTextColor="#777"
           autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="go"
           onSubmitEditing={() => openUrl(address)}
         />
-        {loading && <ActivityIndicator size="small" color="#3b82f6" />}
-        <TouchableOpacity style={styles.goBtn} onPress={() => openUrl(address)}>
-          <Text style={styles.goText}>Git</Text>
-        </TouchableOpacity>
+
+        <NavButton icon="star-outline" onPress={handleAddFavorite} />
+        <NavButton icon="person-outline" onPress={() => setShowAdd(true)} />
+        <NavButton
+          icon="radio-button-on"
+          label="Fare"
+          active={cursorMode}
+          onPress={toggleCursor}
+        />
+        {loading && <ActivityIndicator size="small" color="#4a9eff" style={styles.spinner} />}
       </View>
 
       {accounts.length > 1 && (
-        <View style={styles.accountBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountBar} contentContainerStyle={styles.accountBarContent}>
           {accounts.map((a, i) => (
-            <TouchableOpacity
+            <TVFocusable
               key={i}
+              radius={14}
               onPress={() => setSelected(a)}
               style={[styles.accountChip, selected?.username === a.username && styles.accountChipActive]}
             >
               <Text style={styles.accountChipText}>{a.username}</Text>
-            </TouchableOpacity>
+            </TVFocusable>
           ))}
-        </View>
+          <TVFocusable radius={14} style={styles.accountChip} onPress={handleAutoFill}>
+            <Text style={styles.accountChipText}>Oto-doldur</Text>
+          </TVFocusable>
+        </ScrollView>
       )}
 
       <View style={styles.webWrap}>
@@ -395,14 +327,13 @@ export default function WebViewScreen({ route, navigation }) {
           setSupportMultipleWindows={true}
           javaScriptCanOpenWindowsAutomatically={false}
           originWhitelist={["*"]}
-          injectedJavaScript={TV_NAV_SCRIPT}
+          injectedJavaScript={PAGE_SCRIPT}
           injectedJavaScriptForMainFrameOnly={true}
           onShouldStartLoadWithRequest={(req) => {
             const url = req?.url || "";
             if (!url || url === "about:blank") return true;
             if (httpsOnly && url.startsWith("http://")) {
-              const httpsUrl = url.replace(/^http:/, "https:");
-              webRef.current?.loadUrl(httpsUrl);
+              webRef.current?.loadUrl(url.replace(/^http:/, "https:"));
               return false;
             }
             if (adBlock && isBlockedUrl(url)) return false;
@@ -419,10 +350,10 @@ export default function WebViewScreen({ route, navigation }) {
           }}
           onLoadEnd={() => {
             setLoading(false);
-            // Sayfa yuklendikten sonra kumanda ile sayfa icinde gezinmeye hazir ol.
             try {
               webRef.current?.requestFocus?.();
             } catch (e) {}
+            if (cursorMode) applyCursorMode(true);
           }}
           onError={(e) => {
             setLoading(false);
@@ -446,29 +377,37 @@ export default function WebViewScreen({ route, navigation }) {
             if (nav.title) setPageTitle(nav.title);
           }}
         />
+
+        {cursorMode && showHint && (
+          <View style={styles.cursorHint} pointerEvents="none">
+            <Text style={styles.cursorHintText}>
+              Fare modu: yön tuşları daireyi gezer, OK tıklar
+            </Text>
+          </View>
+        )}
+
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Sayfa açılamadı</Text>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.saveBtn} onPress={() => webRef.current?.reload()}>
+            <TVFocusable style={styles.saveBtn} radius={10} onPress={() => webRef.current?.reload()}>
               <Text style={styles.saveText}>Yeniden Dene</Text>
-            </TouchableOpacity>
+            </TVFocusable>
           </View>
         )}
       </View>
 
       <Modal visible={showTabs} transparent animationType="slide">
         <View style={styles.modalBg}>
+          <TvFocusScope />
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Sekmeler</Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {tabs.map((t, i) => (
-                <View
-                  key={i}
-                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8 }}
-                >
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
+                <View key={i} style={styles.tabRow}>
+                  <TVFocusable
+                    radius={8}
+                    style={styles.tabOpen}
                     onPress={() => {
                       openUrl(t.url);
                       setShowTabs(false);
@@ -476,61 +415,67 @@ export default function WebViewScreen({ route, navigation }) {
                   >
                     <Text style={styles.tabTitle} numberOfLines={1}>{t.title}</Text>
                     <Text style={styles.tabUrl} numberOfLines={1}>{t.url}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </TVFocusable>
+                  <TVFocusable
+                    radius={8}
+                    style={styles.tabClose}
                     onPress={async () => {
                       const updated = await removeTab(t.url);
                       setTabs(updated);
                     }}
                   >
                     <Text style={styles.remove}>Kapat</Text>
-                  </TouchableOpacity>
+                  </TVFocusable>
                 </View>
               ))}
               {tabs.length === 0 && <Text style={styles.empty}>Açık sekme yok.</Text>}
             </ScrollView>
-            <TouchableOpacity
+            <TVFocusable
               style={styles.saveBtn}
+              radius={10}
               onPress={() => {
                 setShowTabs(false);
                 navigation.navigate("Siteler", { screen: "Sites" });
               }}
             >
               <Text style={styles.saveText}>Yeni Sekme (Site Listesi)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowTabs(false)}>
+            </TVFocusable>
+            <TVFocusable style={styles.cancelBtn} radius={10} onPress={() => setShowTabs(false)}>
               <Text style={styles.cancel}>Kapat</Text>
-            </TouchableOpacity>
+            </TVFocusable>
           </View>
         </View>
       </Modal>
 
       <Modal visible={showAdd} transparent animationType="slide">
         <View style={styles.modalBg}>
+          <TvFocusScope />
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Hesap Ekle — {site.name}</Text>
             <TextInput
-              style={styles.input}
+              {...usernameFocus.focusProps}
+              style={[styles.input, usernameFocus.focused && styles.inputFocused]}
               placeholder="E-posta / Kullanıcı"
-              placeholderTextColor="#888"
+              placeholderTextColor="#666"
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
             />
             <TextInput
-              style={styles.input}
+              {...passwordFocus.focusProps}
+              style={[styles.input, passwordFocus.focused && styles.inputFocused]}
               placeholder="Şifre"
-              placeholderTextColor="#888"
+              placeholderTextColor="#666"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleAddAccount}>
+            <TVFocusable style={styles.saveBtn} radius={10} onPress={handleAddAccount}>
               <Text style={styles.saveText}>Kaydet</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowAdd(false)}>
+            </TVFocusable>
+            <TVFocusable style={styles.cancelBtn} radius={10} onPress={() => setShowAdd(false)}>
               <Text style={styles.cancel}>İptal</Text>
-            </TouchableOpacity>
+            </TVFocusable>
           </View>
         </View>
       </Modal>
@@ -539,63 +484,116 @@ export default function WebViewScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0b0b0f" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 12, backgroundColor: "#15151f" },
-  title: { color: "#fff", fontSize: 20, fontWeight: "700", flexShrink: 1, marginRight: 8 },
-  btn: { backgroundColor: "#2a2a3a", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 6 },
-  btnText: { color: "#fff", fontSize: 14 },
-  btnDisabled: { opacity: 0.35 },
-  accountBar: { flexDirection: "row", padding: 8, backgroundColor: "#101018", gap: 6 },
-  accountChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: "#1a1a24" },
-  accountChipActive: { backgroundColor: "#3b82f6" },
-  accountChipText: { color: "#fff", fontSize: 13 },
-  addressBar: { flexDirection: "row", padding: 8, backgroundColor: "#101018", gap: 6, alignItems: "center" },
-  homeBtn: { backgroundColor: "#2a2a3a", paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  container: { flex: 1, backgroundColor: "#0f0f0f" },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#151515",
+    borderBottomWidth: 1,
+    borderBottomColor: "#222"
+  },
+  navBtn: {
+    height: 40,
+    minWidth: 40,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: "#222",
+    borderWidth: 1,
+    borderColor: "#2e2e2e",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 5
+  },
+  navBtnActive: { backgroundColor: "#4a9eff", borderColor: "#6cb4ff" },
+  navBtnDisabled: { opacity: 0.35 },
+  navBtnLabel: { color: "#cfcfcf", fontSize: 14, fontWeight: "600" },
+  navBtnLabelActive: { color: "#fff" },
   addressInput: {
     flex: 1,
-    backgroundColor: "#0b0b0f",
-    color: "#fff",
-    padding: 10,
-    borderRadius: 8,
+    height: 40,
+    backgroundColor: "#222",
     borderWidth: 1,
-    borderColor: "#2a2a3a",
-    fontSize: 15
+    borderColor: "#2e2e2e",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    color: "#fff",
+    fontSize: 16
   },
-  goBtn: { backgroundColor: "#3b82f6", paddingHorizontal: 14, justifyContent: "center", borderRadius: 8 },
-  goText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  addressInputFocused: { borderColor: "#4a9eff", backgroundColor: "#1b2533" },
+  spinner: { marginLeft: 4 },
+
+  accountBar: { backgroundColor: "#101010", borderBottomWidth: 1, borderBottomColor: "#1e1e1e", maxHeight: 52 },
+  accountBarContent: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" },
+  accountChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: "#1e1e1e" },
+  accountChipActive: { backgroundColor: "#4a9eff" },
+  accountChipText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+
   webWrap: { flex: 1 },
   web: { flex: 1 },
+  cursorHint: {
+    position: "absolute",
+    left: 16,
+    bottom: 16,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderWidth: 1,
+    borderColor: "#4a9eff",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  cursorHintText: { color: "#cfe4ff", fontSize: 14 },
+
   errorBox: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(11,11,15,0.94)",
+    backgroundColor: "rgba(15,15,15,0.95)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24
   },
-  errorTitle: { color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 8 },
-  errorText: { color: "#aaa", fontSize: 15, textAlign: "center", marginBottom: 16 },
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 24 },
-  modal: { backgroundColor: "#15151f", borderRadius: 16, padding: 20 },
-  modalTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 12 },
+  errorTitle: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 8 },
+  errorText: { color: "#aaa", fontSize: 16, textAlign: "center", marginBottom: 18 },
+
+  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "center", padding: 40 },
+  modal: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#2e2e2e",
+    padding: 24
+  },
+  modalTitle: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 16 },
+  tabRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  tabOpen: { flex: 1, backgroundColor: "#222", borderRadius: 8, padding: 12 },
+  tabClose: { backgroundColor: "#2a1420", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12 },
+  tabTitle: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  tabUrl: { color: "#777", fontSize: 12, marginTop: 2 },
+  remove: { color: "#ef4444", fontSize: 14, fontWeight: "600" },
   input: {
-    backgroundColor: "#0b0b0f",
+    backgroundColor: "#0f0f0f",
     color: "#fff",
-    padding: 12,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 50,
+    borderRadius: 8,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#2a2a3a",
-    fontSize: 15
+    borderColor: "#2e2e2e",
+    fontSize: 16
   },
-  saveBtn: { backgroundColor: "#3b82f6", padding: 12, borderRadius: 10, alignItems: "center", marginTop: 4 },
-  saveText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  cancel: { color: "#888", textAlign: "center", marginTop: 12, fontSize: 15 },
-  tabTitle: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  tabUrl: { color: "#666", fontSize: 12, marginTop: 2 },
-  remove: { color: "#ef4444", fontSize: 14, marginLeft: 12 },
-  empty: { color: "#666", textAlign: "center", marginTop: 20 }
+  inputFocused: { borderColor: "#4a9eff", backgroundColor: "#1b2533" },
+  saveBtn: { backgroundColor: "#4a9eff", height: 48, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: 6 },
+  saveText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  cancelBtn: { backgroundColor: "#242424", height: 46, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: 10 },
+  cancel: { color: "#aaa", fontSize: 16 },
+  empty: { color: "#666", textAlign: "center", marginVertical: 20, fontSize: 16 }
 });
