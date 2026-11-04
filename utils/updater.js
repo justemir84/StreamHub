@@ -167,6 +167,10 @@ export async function installApk(fileUri) {
       // FLAG_GRANT_READ_URI_PERMISSION
       flags: 1,
     });
+    // Güncelleme kurulum ekranina aktarildi; APK artik gerekli degil, temizle.
+    try {
+      await FileSystem.deleteAsync(fileUri, { idempotent: true });
+    } catch (_) {}
     return true;
   } catch (e) {
     throw new Error(
