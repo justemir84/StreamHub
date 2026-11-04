@@ -49,12 +49,21 @@ function escapeForScript(value) {
     .replace(/\n/g, "\\n");
 }
 
-function NavButton({ icon, onPress, disabled = false, active = false, label, hasTVPreferredFocus = false }) {
+function NavButton({
+  icon,
+  onPress,
+  disabled = false,
+  active = false,
+  label,
+  hasTVPreferredFocus = false,
+  autoFocus = false,
+}) {
   return (
     <TVFocusable
       radius={8}
       disabled={disabled}
       hasTVPreferredFocus={hasTVPreferredFocus}
+      autoFocus={autoFocus}
       onPress={onPress}
       style={[styles.navBtn, active && styles.navBtnActive, disabled && styles.navBtnDisabled]}
     >
@@ -92,6 +101,8 @@ export default function WebViewScreen({ route, navigation }) {
   const [cursorMode, setCursorModeState] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [toolbarFocusKey, setToolbarFocusKey] = useState(0);
+  const [desktopMode, setDesktopMode] = useState(true);
+  const [fullscreenVideo, setFullscreenVideo] = useState(false);
   const addressFocus = useFocusableInput();
   const usernameFocus = useFocusableInput();
   const passwordFocus = useFocusableInput();
@@ -101,6 +112,12 @@ export default function WebViewScreen({ route, navigation }) {
   // yakalayip cursor modunda __STREAMHUB_MOVE__ / __STREAMHUB_CLICK__ olarak
   // sayfaya enjekte eder; focus modunda ise KeyboardEvent ile sayfaya iletir.
   const keyCaptureRef = useRef(null);
+  // Fullscreen videoya gecilis sirasinda cursor mode'unu saklayip geri yuklemek icin.
+  const savedCursorMode = useRef(false);
+
+  // Varsayilan masaüstü UA; mobilde WebView'in kendi UA'si kullanilir (undefined).
+  const DESKTOP_UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   useEffect(() => {
     getAdBlock().then(setAdBlock);
@@ -181,6 +198,30 @@ export default function WebViewScreen({ route, navigation }) {
     if (next) setShowHint(true);
   }, [cursorMode, applyCursorMode]);
 
+  const toggleDesktopMode = useCallback(() => {
+    setDesktopMode((d) => !d);
+  }, []);
+
+  // Fullscreen videoya gectiginde fare modunu gecici durdur: D-pad video kontrollerine
+  // gecsin (ileri/geri seek vs), fare imleci karismasin. Fullscreenden cikinca eski
+  // cursor mode geri yuklenir.
+  const onShowFullscreenVideo = useCallback(() => {
+    setFullscreenVideo(true);
+    savedCursorMode.current = cursorMode;
+    if (cursorMode) {
+      setCursorModeState(false);
+      setShowHint(false);
+    }
+  }, [cursorMode]);
+
+  const onHideFullscreenVideo = useCallback(() => {
+    setFullscreenVideo(false);
+    if (savedCursorMode.current) {
+      setCursorModeState(true);
+      setShowHint(true);
+    }
+  }, []);
+
   // D-pad / OK tuslarini yakalar. Cursor modu acikken __STREAMHUB_MOVE__ /
   // __STREAMHUB_CLICK__ komutlarini WebView'e enjekte eder; focus modunda ise
   // sayfadaki odak motorunun calismasi icin KeyboardEvent'i sayfaya iletir.
@@ -197,6 +238,8 @@ export default function WebViewScreen({ route, navigation }) {
       const ok = key === "Enter" || code === 13 || key === " " || code === 32 || code === 23 || code === 66;
 
       if (!(up || down || left || right || ok)) return;
+      // Fullscreen videoda D-pad'i RN'den engelle: video kendi ileri/geri kontrollerini kullanir.
+      if (fullscreenVideo) return;
 
       try {
         e.preventDefault?.();
@@ -224,7 +267,7 @@ export default function WebViewScreen({ route, navigation }) {
         webRef.current?.injectJavaScript(script);
       }
     },
-    [cursorMode, moveCommand, clickCommand]
+    [cursorMode, fullscreenVideo, moveCommand, clickCommand]
   );
 
   // WebView'den gelen mesajlari isler. 'streamhub:toToolbar' imlecin en
@@ -328,6 +371,7 @@ export default function WebViewScreen({ route, navigation }) {
           hasTVPreferredFocus
           focusable={!cursorMode}
           key={toolbarFocusKey}
+          autoFocus={true}
         />
         <NavButton
           icon="arrow-back"
@@ -369,6 +413,13 @@ export default function WebViewScreen({ route, navigation }) {
           onPress={toggleCursor}
           focusable={!cursorMode}
         />
+        <NavButton
+          icon={desktopMode ? "desktop-outline" : "tablet-outline"}
+          label={desktopMode ? "Masaüstü" : "Mobil"}
+          active={desktopMode}
+          onPress={toggleDesktopMode}
+          focusable={!cursorMode}
+        />
         {loading && <ActivityIndicator size="small" color="#4a9eff" style={styles.spinner} />}
       </View>
 
@@ -395,6 +446,7 @@ export default function WebViewScreen({ route, navigation }) {
           ref={webRef}
           source={{ uri: sourceUrl }}
           style={styles.web}
+          userAgent={desktopMode ? DESKTOP_UA : undefined}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={thirdPartyCookies}
           javaScriptEnabled={true}
@@ -438,6 +490,8 @@ export default function WebViewScreen({ route, navigation }) {
             // sayfaya enjekte edilecek. requestFocus() cagirilmamali.
             if (cursorMode) applyCursorMode(true);
           }}
+          onShowFullscreenVideo={onShowFullscreenVideo}
+          onHideFullscreenVideo={onHideFullscreenVideo}
           onMessage={handleMessage}
           onError={(e) => {
             setLoading(false);

@@ -30,6 +30,7 @@ export default function TVFocusable({
   disabled = false,
   focusScale = 1.06,
   radius = 12,
+  autoFocus = false,
   ...rest
 }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -91,6 +92,13 @@ export default function TVFocusable({
       }
     });
   });
+
+  // anahtar degistiginde (orn. toToolbarFocusKey) bu ogeye programatik odak gonder.
+  useEffect(() => {
+    if (autoFocus && viewRef.current) {
+      viewRef.current.focus?.();
+    }
+  }, [autoFocus]);
 
   const handleFocus = useCallback(
     (e) => {
