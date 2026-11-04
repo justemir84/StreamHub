@@ -159,6 +159,7 @@ export const PAGE_SCRIPT = `
       } catch (e) {}
     }
 
+    var lastClickTime = 0;
     function clickCursor() {
       var el = null;
       try { el = document.elementFromPoint(S.x, S.y); } catch (e) {}
@@ -178,6 +179,17 @@ export const PAGE_SCRIPT = `
       fireTouch(target, 'touchend');
       fire(target, 'mouseup');
       fire(target, 'click');
+
+      // Video uzerinde cift tikla -> tam ekran ac (YouTube vb. icin).
+      var now = Date.now();
+      var video = null;
+      try { video = target.closest ? target.closest('video') : null; } catch (_) {}
+      if (!video && target.tagName === 'VIDEO') video = target;
+      if (video && now - lastClickTime < 400) {
+        try { video.webkitEnterFullScreen?.(); } catch (_) {}
+        try { video.requestFullscreen?.(); } catch (_) {}
+      }
+      lastClickTime = now;
       return true;
     }
 

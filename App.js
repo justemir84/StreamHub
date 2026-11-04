@@ -20,7 +20,11 @@ function SitesStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Sites" component={SitesScreen} />
-      <Stack.Screen name="WebView" component={WebViewScreen} />
+      <Stack.Screen
+        name="WebView"
+        component={WebViewScreen}
+        options={{ tabBarVisible: false }}
+      />
     </Stack.Navigator>
   );
 }

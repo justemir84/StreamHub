@@ -93,11 +93,14 @@ export default function TVFocusable({
     });
   });
 
-  // anahtar degistiginde (orn. toToolbarFocusKey) bu ogeye programatik odak gonder.
+  // toolbarFocusKey degistiginde (orn. toToolbar'dan donus) bu ogeye programatik odak gonder.
+  // Native view henuz hazir degilse 50 ms sonra tekrar dene.
   useEffect(() => {
-    if (autoFocus && viewRef.current) {
-      viewRef.current.focus?.();
-    }
+    if (!autoFocus) return undefined;
+    const timer = setTimeout(() => {
+      viewRef.current?.focus?.();
+    }, 50);
+    return () => clearTimeout(timer);
   }, [autoFocus]);
 
   const handleFocus = useCallback(

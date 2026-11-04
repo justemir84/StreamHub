@@ -365,11 +365,13 @@ export default function WebViewScreen({ route, navigation }) {
     >
       {/* tarayici arac cubugu */}
       <View style={styles.toolbar}>
+        {/* TUM toolbar tuslari her zaman focusable (cursor modunda da): D-pad ile
+             ev <- -> masaustu butonuna ve URL'ye gidebilmelidir. */}
         <NavButton
           icon="home-outline"
           onPress={goHome}
           hasTVPreferredFocus
-          focusable={!cursorMode}
+          focusable={true}
           key={toolbarFocusKey}
           autoFocus={true}
         />
@@ -377,15 +379,15 @@ export default function WebViewScreen({ route, navigation }) {
           icon="arrow-back"
           disabled={!canGoBack}
           onPress={() => webRef.current?.goBack()}
-          focusable={!cursorMode}
+          focusable={true}
         />
         <NavButton
           icon="arrow-forward"
           disabled={!canGoForward}
           onPress={() => webRef.current?.goForward()}
-          focusable={!cursorMode}
+          focusable={true}
         />
-        <NavButton icon="refresh" onPress={() => webRef.current?.reload()} focusable={!cursorMode} />
+        <NavButton icon="refresh" onPress={() => webRef.current?.reload()} focusable={true} />
 
         <TextInput
           {...addressFocus.focusProps}
@@ -401,24 +403,24 @@ export default function WebViewScreen({ route, navigation }) {
           autoCorrect={false}
           returnKeyType="go"
           onSubmitEditing={() => openUrl(address)}
-          focusable={!cursorMode}
+          focusable={true}
         />
 
-        <NavButton icon="star-outline" onPress={handleAddFavorite} focusable={!cursorMode} />
-        <NavButton icon="person-outline" onPress={() => setShowAdd(true)} focusable={!cursorMode} />
+        <NavButton icon="star-outline" onPress={handleAddFavorite} focusable={true} />
+        <NavButton icon="person-outline" onPress={() => setShowAdd(true)} focusable={true} />
         <NavButton
           icon="radio-button-on"
           label="Fare"
           active={cursorMode}
           onPress={toggleCursor}
-          focusable={!cursorMode}
+          focusable={true}
         />
         <NavButton
           icon={desktopMode ? "desktop-outline" : "tablet-outline"}
           label={desktopMode ? "Masaüstü" : "Mobil"}
           active={desktopMode}
           onPress={toggleDesktopMode}
-          focusable={!cursorMode}
+          focusable={true}
         />
         {loading && <ActivityIndicator size="small" color="#4a9eff" style={styles.spinner} />}
       </View>
@@ -443,6 +445,7 @@ export default function WebViewScreen({ route, navigation }) {
 
       <View style={styles.webWrap}>
         <WebView
+          key={desktopMode ? 'web-desktop' : 'web-mobile'}
           ref={webRef}
           source={{ uri: sourceUrl }}
           style={styles.web}
