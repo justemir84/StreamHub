@@ -31,6 +31,7 @@ export default function FavoritesScreen({ navigation }) {
         </TVFocusable>
       </View>
       <FlatList
+        focusable={false}
         data={[...favs].sort((a, b) => sort === "title" ? (a.title || "").localeCompare(b.title || "") : (b.createdAt || 0) - (a.createdAt || 0))}
         keyExtractor={(item, i) => item.siteId + item.url + i}
         renderItem={({ item, index }) => (

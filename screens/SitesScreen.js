@@ -371,9 +371,19 @@ export default function SitesScreen({ navigation }) {
     await saveCategories(next);
   };
 
+  // Ilk bolumun ilk karti acilista odaklansin (kumandayla hemen gezinilebilsin).
+  const firstFocusSectionId = displaySections.find((s) => s.items.length > 0)?.id;
+
   return (
     <View style={styles.container}>
-      <ScrollView ref={outerRef} style={styles.scroll} contentContainerStyle={styles.content}>
+      {/* focusable={false}: aksi halde Android TV odagi dis ScrollView'a veriyor
+          ve D-pad asagi basildiginda ScrollView kaydirip kartlara inmiyor. */}
+      <ScrollView
+        ref={outerRef}
+        focusable={false}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+      >
         {/* ust bar */}
         <View style={styles.topBar}>
           <Text style={styles.brand}>StreamHub</Text>
@@ -496,6 +506,7 @@ export default function SitesScreen({ navigation }) {
                   rowRefs.current[section.id] = r;
                 }}
                 horizontal
+                focusable={false}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.row}
               >
@@ -505,6 +516,9 @@ export default function SitesScreen({ navigation }) {
                     radius={12}
                     style={styles.card}
                     focusable={!editMode}
+                    hasTVPreferredFocus={
+                      !editMode && section.id === firstFocusSectionId && index === 0
+                    }
                     onFocus={() => handleCardFocus(section.id, index)}
                     onPress={() => openItem(item)}
                   >

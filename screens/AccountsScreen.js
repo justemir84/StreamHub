@@ -99,6 +99,7 @@ export default function AccountsScreen() {
   return (
     <View style={styles.container}>
       <FlatList
+        focusable={false}
         data={accounts}
         keyExtractor={(item, i) => item.siteId + item.username + i}
         contentContainerStyle={styles.content}

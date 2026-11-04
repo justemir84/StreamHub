@@ -289,7 +289,7 @@ export default function WebViewScreen({ route, navigation }) {
       </View>
 
       {accounts.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountBar} contentContainerStyle={styles.accountBarContent}>
+        <ScrollView horizontal focusable={false} showsHorizontalScrollIndicator={false} style={styles.accountBar} contentContainerStyle={styles.accountBarContent}>
           {accounts.map((a, i) => (
             <TVFocusable
               key={i}
@@ -402,7 +402,7 @@ export default function WebViewScreen({ route, navigation }) {
           <TvFocusScope />
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Sekmeler</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
+            <ScrollView focusable={false} style={{ maxHeight: 320 }}>
               {tabs.map((t, i) => (
                 <View key={i} style={styles.tabRow}>
                   <TVFocusable
