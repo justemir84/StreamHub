@@ -93,15 +93,8 @@ export default function TVFocusable({
     });
   });
 
-  // toolbarFocusKey degistiginde (orn. toToolbar'dan donus) bu ogeye programatik odak gonder.
-  // Native view henuz hazir degilse 50 ms sonra tekrar dene.
-  useEffect(() => {
-    if (!autoFocus) return undefined;
-    const timer = setTimeout(() => {
-      viewRef.current?.focus?.();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [autoFocus]);
+  // autoFocus true ise hasTVPreferredFocus ile ilk odak bu ogede verilir.
+  // key degistiginde (orn. toolbarFocusKey) view remount olur ve odak geri doner.
 
   const handleFocus = useCallback(
     (e) => {
@@ -138,7 +131,7 @@ export default function TVFocusable({
       ref={viewRef}
       focusable={focusable && !disabled}
       disabled={disabled}
-      hasTVPreferredFocus={hasTVPreferredFocus}
+      hasTVPreferredFocus={hasTVPreferredFocus || autoFocus}
       onFocus={handleFocus}
       onBlur={handleBlur}
       onPress={disabled ? undefined : onPress}

@@ -115,6 +115,15 @@ export default function WebViewScreen({ route, navigation }) {
   // Fullscreen videoya gecilis sirasinda cursor mode'unu saklayip geri yuklemek icin.
   const savedCursorMode = useRef(false);
 
+  // WebView'e geldiginde alt sekme cubugunu (Siteler/Favoriler/Ayarlar) gizle,
+  // cikinca geri getir. tabBarVisible Stack.Screen options'dan parent Tab.Navigator'a
+  // yansimadigi icin navigation.getParent() ile ayarlaniyor.
+  useEffect(() => {
+    const parent = navigation.getParent();
+    parent?.setOptions({ tabBarVisible: false });
+    return () => parent?.setOptions({ tabBarVisible: true });
+  }, [navigation]);
+
   // Varsayilan masaüstü UA; mobilde WebView'in kendi UA'si kullanilir (undefined).
   const DESKTOP_UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -359,8 +368,6 @@ export default function WebViewScreen({ route, navigation }) {
   return (
     <View
       style={styles.container}
-      focusable={true}
-      hasTVPreferredFocus={true}
       onKeyDown={handleKeyDown}
     >
       {/* tarayici arac cubugu */}
